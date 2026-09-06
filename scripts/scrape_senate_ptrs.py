@@ -48,8 +48,14 @@ STATUS_CSV = STATUS_DIR / "senate_ptr_scrape_status.csv"
 
 # Overridable via environment variables so the GitHub Action can tune runs
 # (e.g. a full backfill vs. a routine incremental run) without editing code.
-START_DATE = os.environ.get("SENATE_PTR_START_DATE", "2021-01-01")
-END_DATE = os.environ.get("SENATE_PTR_END_DATE", date.today().isoformat())
+# Use `or default` rather than `.get(key, default)` -- GitHub Actions sets
+# these env vars to an empty string (not unset) both for scheduled runs
+# (no workflow_dispatch inputs exist) and manual runs with blank inputs,
+# and `.get()` only falls back to its default when the key is missing
+# entirely, not when it's present-but-empty. This was the root cause of
+# every automated run crashing instantly on pd.to_datetime("").
+START_DATE = os.environ.get("SENATE_PTR_START_DATE") or "2021-01-01"
+END_DATE = os.environ.get("SENATE_PTR_END_DATE") or date.today().isoformat()
 
 BATCH_SIZE = int(os.environ.get("SENATE_PTR_BATCH_SIZE", "100"))
 REQUEST_DELAY = float(os.environ.get("SENATE_PTR_REQUEST_DELAY", "0.40"))
