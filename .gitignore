@@ -1,14 +1,4 @@
-# Scraped/derived data outputs (not source-controlled)
-01 Official Senate PTR HTML/
-02 Senate PTR Filing Indexes/
-03 Parsed Senate PTR Transaction Data/
-04 Scrape Checkpoints and Status/
-*.csv
-*.xlsx
-
-# Jupyter
+# Local scratch / editor
 .ipynb_checkpoints/
-
-# OS/editor cruft
 .DS_Store
 Thumbs.db

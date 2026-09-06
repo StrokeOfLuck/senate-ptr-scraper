@@ -1,0 +1,79 @@
+name: Scrape Senate PTRs
+
+on:
+  schedule:
+    # Two entries to keep this at ~9:30am US Eastern year-round despite
+    # cron not shifting for daylight saving:
+    #   - 13:30 UTC = 9:30am Eastern during EDT (roughly mid-Mar to early-Nov)
+    #   - 14:30 UTC = 9:30am Eastern during EST (roughly early-Nov to mid-Mar)
+    # Both run daily; the one outside the current DST period is a harmless
+    # extra run (off by an hour from 9:30am local) rather than a missed one.
+    - cron: "30 13 * 3-11 *"
+    - cron: "30 14 * 1,2,12 *"
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Override start date (YYYY-MM-DD). Leave blank to use the script default."
+        required: false
+        default: ""
+      end_date:
+        description: "Override end date (YYYY-MM-DD). Leave blank to use today."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Senate PTR scraper
+        env:
+          SENATE_PTR_START_DATE: ${{ github.event.inputs.start_date }}
+          SENATE_PTR_END_DATE: ${{ github.event.inputs.end_date }}
+        run: python scripts/scrape_senate_ptrs.py
+
+      - name: Commit and push updated data
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Update Senate PTR data ($(date -u +%Y-%m-%d))"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify sean-data-portfolio to rebuild
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          SITE_DISPATCH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$SITE_DISPATCH_TOKEN" ]; then
+            echo "SITE_DISPATCH_TOKEN secret not set - skipping site rebuild dispatch."
+            exit 0
+          fi
+
+          curl -sSf -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $SITE_DISPATCH_TOKEN" \
+            https://api.github.com/repos/StrokeOfLuck/sean-data-portfolio/dispatches \
+            -d '{"event_type": "senate-data-updated"}'
