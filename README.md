@@ -1,75 +1,113 @@
 # Senate PTR Scraper
 
-Scrapes official electronic Senate Periodic Transaction Reports (PTRs) from
-the Senate's Electronic Financial Disclosure (eFD) system at
-[efdsearch.senate.gov](https://efdsearch.senate.gov).
+Collects official U.S. Senate Periodic Transaction Reports (PTRs) from the Senate Electronic Financial Disclosure system and converts electronic filings into structured transaction data.
 
-## What it does
+Unlike House PTRs, many Senate filings are available as structured HTML. This repository focuses on those electronic filings while keeping paper filings visible in the filing index for separate processing.
 
-- Searches the official Senate eFD PTR index for a configurable date range.
-- Identifies both electronic (`/ptr/`) and paper (`/paper/`) filings.
-- **Scrapes only electronic PTRs** -- parses the official HTML transaction
-  table for each filing.
-- Saves the official HTML, a filing index, a transaction CSV, and a scrape
-  status CSV.
-- Resumes from an existing transaction CSV on subsequent runs instead of
-  re-scraping everything.
+## Official source
 
-Paper filings are intentionally **not** downloaded or parsed here. They're
-kept in the filing index and marked `paper_deferred` in the status file, to
-be handled by a separate project later.
+Senate PTR data is retrieved from the U.S. Senate Electronic Financial Disclosure system:
 
-## Automated scraping (GitHub Actions)
+https://efdsearch.senate.gov/
 
-`scripts/scrape_senate_ptrs.py` is the automation-friendly version of the
-pipeline, run daily by `.github/workflows/scrape.yml` (~9:30am US Eastern).
-It writes data into `data/` in this repo:
+The scraper accepts the site's disclosure agreement, searches the official PTR index for the configured date range, and follows each electronic filing to its transaction table.
 
-```
+## What the scraper does
+
+1. Searches the official Senate eFD PTR index for a configurable date range.
+2. Identifies electronic and paper filings.
+3. Parses transaction tables from electronic PTRs.
+4. Saves the official filing HTML for archival and verification.
+5. Maintains filing-index, transaction, and scrape-status CSVs.
+6. Reuses previously parsed electronic filings on later runs.
+
+Paper filings are recorded but intentionally not parsed by this pipeline. They are marked `paper_deferred` for separate document-processing work.
+
+## Repository data
+
+Automated runs write into `data/`:
+
+```text
 data/
-|-- 01_html/                 raw HTML per electronic filing
-|-- 02_filing_index/         senate_ptr_filing_index.csv
-|-- 03_transactions/         senate_ptr_transactions_electronic.csv
-`-- 04_status/               senate_ptr_scrape_status.csv
+├── 01_html/           archived HTML for electronic filings
+├── 02_filing_index/   senate_ptr_filing_index.csv
+├── 03_transactions/   senate_ptr_transactions_electronic.csv
+└── 04_status/         senate_ptr_scrape_status.csv
 ```
 
-The workflow commits any data changes back to this repo, then (if the
-`SITE_DISPATCH_TOKEN` secret is configured) notifies the `sean-data-portfolio`
-site repo to rebuild and redeploy with the fresh data.
+The transaction CSV is the main structured output for downstream analysis and the portfolio site.
 
-Config is overridable via environment variables (see the top of
-`scripts/scrape_senate_ptrs.py`): `SENATE_PTR_START_DATE`,
-`SENATE_PTR_END_DATE`, `SENATE_PTR_BATCH_SIZE`, `SENATE_PTR_REQUEST_DELAY`,
-`SENATE_PTR_MAX_SEARCH_PAGES`, `SENATE_PTR_SAVE_HTML`,
-`SENATE_PTR_RESUME_EXISTING`.
+## Automation
 
-Setup steps that must be done manually in the GitHub UI (repo permissions,
-the dispatch token, GitHub Pages) are documented in
-`sean-data-portfolio/AUTOMATION_SETUP.md`.
+The repository includes a GitHub Actions workflow at `.github/workflows/scrape.yml`.
 
-## Notebook (manual/exploratory use)
+It runs daily at approximately **9:30 AM U.S. Eastern**, installs the Python requirements, runs the scraper, commits updated data back to the repository, and can notify the `sean-data-portfolio` repository to rebuild when new Senate data is available.
 
-[`notebooks/Scrape_Official_Senate_PTRs_Electronic_Only.ipynb`](notebooks/Scrape_Official_Senate_PTRs_Electronic_Only.ipynb)
+The workflow also supports manual date-range overrides.
 
-The original Colab notebook this script was ported from. Still useful for
-manual/exploratory runs (e.g. archiving a personal copy of the data to
-Google Drive) -- mounts Google Drive for storage and installs its own
-dependencies in Cell 1. Not used by the automated pipeline.
+## Run locally
 
-## Requirements
+Create a virtual environment and install the requirements:
 
-See `requirements.txt` (`beautifulsoup4`, `lxml`, `openpyxl`, `pandas`,
-`requests`).
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-## Notes
+Run the scraper:
 
-- Runs on standard GitHub Actions runners -- no GPU/accelerator needed.
-- Respects a configurable `SENATE_PTR_REQUEST_DELAY` between requests to
-  the Senate site; increase this if you hit HTTP 403 responses (IP-level
-  blocking).
-- The search pagination loop has a hard `SENATE_PTR_MAX_SEARCH_PAGES`
-  safety cap to prevent runaway loops if the Senate API response shape
-  ever changes.
-- Raw per-filing HTML is committed to git by design (kept for archival
-  purposes); this is expected to stay well within GitHub's soft repo-size
-  guidance given Senate's filing volume, but worth monitoring over time.
+```powershell
+python scripts/scrape_senate_ptrs.py
+```
+
+## Configuration
+
+Runtime settings can be changed with environment variables:
+
+```text
+SENATE_PTR_START_DATE
+SENATE_PTR_END_DATE
+SENATE_PTR_BATCH_SIZE
+SENATE_PTR_REQUEST_DELAY
+SENATE_PTR_MAX_SEARCH_PAGES
+SENATE_PTR_SAVE_HTML
+SENATE_PTR_RESUME_EXISTING
+```
+
+The default date range begins on `2021-01-01` and ends on the current date.
+
+Example:
+
+```powershell
+$env:SENATE_PTR_START_DATE="2025-01-01"
+$env:SENATE_PTR_REQUEST_DELAY="0.75"
+python scripts/scrape_senate_ptrs.py
+```
+
+## Electronic vs. paper filings
+
+This distinction is important:
+
+**Electronic PTRs** are parsed from the official Senate HTML transaction table.
+
+**Paper PTRs** remain in the filing index but are not downloaded or extracted here.
+
+Keeping those records in the index makes the gap explicit instead of silently excluding filings the current parser cannot handle.
+
+## Reliability and source preservation
+
+The scraper keeps the official HTML for electronic filings so parsed records can be checked against the source.
+
+Requests include retry handling and a configurable delay between calls. The Senate eFD site can still return HTTP 403 responses to automated runners, so failed runs may require a later retry or a longer request delay.
+
+A hard pagination limit is also used to prevent runaway searches if the eFD response format changes unexpectedly.
+
+## Original notebook
+
+The exploratory Colab version remains available at:
+
+`notebooks/Scrape_Official_Senate_PTRs_Electronic_Only.ipynb`
+
+The notebook is useful for manual or exploratory work. The production automation uses `scripts/scrape_senate_ptrs.py`.
