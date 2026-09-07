@@ -14,6 +14,7 @@ downloaded or parsed.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import time
@@ -45,6 +46,7 @@ for folder in [DATA_DIR, RAW_DIR, INDEX_DIR, TRANSACTIONS_DIR, STATUS_DIR]:
 FILING_INDEX_CSV = INDEX_DIR / "senate_ptr_filing_index.csv"
 TRANSACTIONS_CSV = TRANSACTIONS_DIR / "senate_ptr_transactions_electronic.csv"
 STATUS_CSV = STATUS_DIR / "senate_ptr_scrape_status.csv"
+METADATA_JSON = DATA_DIR / "senate_ptr_metadata.json"
 
 # Overridable via environment variables so the GitHub Action can tune runs
 # (e.g. a full backfill vs. a routine incremental run) without editing code.
@@ -685,7 +687,54 @@ def main() -> None:
 
     electronic_filings_count = int((filings_df["filing_format"] == "electronic_html").sum())
     paper_filings_count = int((filings_df["filing_format"] == "paper_scan").sum())
+    unknown_filings_count = int(
+        (~filings_df["filing_format"].isin(["electronic_html", "paper_scan"])).sum()
+    )
 
+    latest_filing_date = None
+    if not filings_df.empty and "filing_date" in filings_df.columns:
+        parsed_filing_dates = pd.to_datetime(filings_df["filing_date"], errors="coerce")
+        if parsed_filing_dates.notna().any():
+            latest_filing_date = parsed_filing_dates.max().strftime("%Y-%m-%d")
+
+    latest_transaction_date = None
+    if not transactions_df.empty and "transaction_date" in transactions_df.columns:
+        parsed_transaction_dates = pd.to_datetime(
+            transactions_df["transaction_date"],
+            errors="coerce",
+        )
+        if parsed_transaction_dates.notna().any():
+            latest_transaction_date = parsed_transaction_dates.max().strftime("%Y-%m-%d")
+
+    status_counts = {
+        str(key): int(value)
+        for key, value in status_df["status"].value_counts(dropna=False).to_dict().items()
+    }
+
+    metadata = {
+        "updated_at_utc": now_utc(),
+        "source": "U.S. Senate Electronic Financial Disclosure",
+        "start_date": START_DATE,
+        "end_date": END_DATE,
+        "filings_total": int(len(filings_df)),
+        "electronic_filings": electronic_filings_count,
+        "paper_filings_deferred": paper_filings_count,
+        "unknown_format_filings": unknown_filings_count,
+        "electronic_transactions": int(len(transactions_df)),
+        "latest_filing_date": latest_filing_date,
+        "latest_transaction_date": latest_transaction_date,
+        "status_counts": status_counts,
+        "filing_index_csv": "data/02_filing_index/senate_ptr_filing_index.csv",
+        "transactions_csv": "data/03_transactions/senate_ptr_transactions_electronic.csv",
+        "status_csv": "data/04_status/senate_ptr_scrape_status.csv",
+    }
+
+    METADATA_JSON.write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
+
+    print("Saved metadata:", METADATA_JSON)
     print()
     print("SENATE PTR ELECTRONIC SCRAPE COMPLETE")
     print("====================================")
