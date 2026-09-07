@@ -1,4 +1,10 @@
-# Local scratch / editor
+# Python / local environments
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# Notebooks / OS
 .ipynb_checkpoints/
 .DS_Store
 Thumbs.db
