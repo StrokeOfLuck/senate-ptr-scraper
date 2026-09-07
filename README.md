@@ -32,10 +32,11 @@ data/
 ├── 01_html/           archived HTML for electronic filings
 ├── 02_filing_index/   senate_ptr_filing_index.csv
 ├── 03_transactions/   senate_ptr_transactions_electronic.csv
-└── 04_status/         senate_ptr_scrape_status.csv
+├── 04_status/         senate_ptr_scrape_status.csv
+└── senate_ptr_metadata.json
 ```
 
-The transaction CSV is the main structured output for downstream analysis and the portfolio site.
+The transaction CSV is the main structured output for downstream analysis and the portfolio site. `senate_ptr_metadata.json` summarizes update time, filing counts, transaction counts, latest dates, and scrape-status totals.
 
 ## Automation
 
