@@ -1,18 +1,19 @@
 {
-  "updated_at_utc": "2026-09-27T17:54:20Z",
+  "updated_at_utc": "2026-09-28T20:12:06Z",
   "source": "U.S. Senate Electronic Financial Disclosure",
   "start_date": "2021-01-01",
-  "end_date": "2026-09-27",
-  "filings_total": 674,
-  "electronic_filings": 577,
+  "end_date": "2026-09-28",
+  "filings_total": 676,
+  "electronic_filings": 579,
   "paper_filings_deferred": 97,
   "unknown_format_filings": 0,
-  "electronic_transactions": 5011,
-  "latest_filing_date": "2026-09-21",
-  "latest_transaction_date": "2026-09-01",
+  "electronic_transactions": 5045,
+  "latest_filing_date": "2026-09-28",
+  "latest_transaction_date": "2026-09-11",
   "status_counts": {
     "ok_reused": 577,
-    "paper_deferred": 97
+    "paper_deferred": 97,
+    "ok": 2
   },
   "filing_index_csv": "data/02_filing_index/senate_ptr_filing_index.csv",
   "transactions_csv": "data/03_transactions/senate_ptr_transactions_electronic.csv",
